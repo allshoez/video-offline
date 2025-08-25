@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<title>Video Grid + Fullscreen Scrollable</title>
+<style>
+body, html {
+  margin:0;
+  padding:0;
+  background:#000;
+  color:#fff;
+  font-family: Arial, sans-serif;
+  height:100%;
+  overflow-y:auto;
+  scroll-behavior: smooth;
+}
+
+/* Grid 3 kolom awal */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:5px;
+  padding:5px;
+}
+
+.video-card {
+  position: relative;
+  background:#111;
+  border-radius:8px;
+  overflow:hidden;
+  height:200px;
+  cursor:pointer;
+}
+
+.video-card video {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.video-title {
+  position:absolute;
+  top:5px;
+  left:5px;
+  font-size:14px;
+  font-weight:bold;
+  color:#fff;
+  text-shadow:0 0 5px #000;
+  z-index:2;
+}
+
+/* Fullscreen overlay scrollable ala Shorts */
+.fullscreen-container {
+  display:none;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  z-index:1000;
+}
+
+.fs-video-card {
+  position: relative;
+  width:100%;
+  height:100vh;
+  scroll-snap-align:start;
+  background:#000;
+  overflow:hidden;
+}
+
+.fs-video-card video {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.fs-title {
+  position:absolute;
+  bottom:80px;
+  left:10px;
+  font-size:20px;
+  font-weight:bold;
+  color:#fff;
+  text-shadow:0 0 5px #000;
+  z-index:2;
+}
+
+.fs-actions {
+  position:absolute;
+  bottom:20px;
+  right:10px;
+  display:flex;
+  flex-direction:column;
+  gap:15px;
+  z-index:2;
+}
+
+.fs-actions div {
+  width:50px;
+  height:50px;
+  background: rgba(255,255,255,0.2);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font-size:24px;
+}
+
+/* Tombol + folder */
+#folderBtn {
+  position:fixed;
+  top:10px;
+  right:10px;
+  font-size:24px;
+  padding:5px 10px;
+  cursor:pointer;
+  background:rgba(255,255,255,0.1);
+  border:none;
+  color:#fff;
+  border-radius:5px;
+  z-index:1001;
+}
+</style>
+</head>
+<body>
+
+<div class="grid-container" id="gridContainer"></div>
+<button id="folderBtn">+</button>
+
+<!-- Fullscreen overlay -->
+<div class="fullscreen-container" id="fsContainer"></div>
+
+<script>
+const gridContainer = document.getElementById('gridContainer');
+const folderBtn = document.getElementById('folderBtn');
+const fsContainer = document.getElementById('fsContainer');
+
+folderBtn.addEventListener('click', async () => {
+  try {
+    const dirHandle = await window.showDirectoryPicker();
+    gridContainer.innerHTML='';
+    fsContainer.innerHTML='';
+
+    for await (const entry of dirHandle.values()){
+      if(entry.kind==='file' && entry.name.endsWith('.mp4')){
+        const file = await entry.getFile();
+        const url = URL.createObjectURL(file);
+
+        // GRID 3 kolom
+        const card = document.createElement('div');
+        card.className='video-card';
+        const vid = document.createElement('video');
+        vid.src=url;
+        vid.loop=true;
+        vid.muted=true;
+        card.appendChild(vid);
+        const title = document.createElement('div');
+        title.className='video-title';
+        title.textContent=entry.name;
+        card.appendChild(title);
+        gridContainer.appendChild(card);
+
+        // FULLSCREEN ala Shorts
+        const fsCard = document.createElement('div');
+        fsCard.className='fs-video-card';
+        const fsVid = document.createElement('video');
+        fsVid.src=url;
+        fsVid.loop=true;
+        fsVid.muted=false;
+        fsVid.playsInline=true;
+        fsCard.appendChild(fsVid);
+        const fsTitle = document.createElement('div');
+        fsTitle.className='fs-title';
+        fsTitle.textContent=entry.name;
+        fsCard.appendChild(fsTitle);
+        const fsActions = document.createElement('div');
+        fsActions.className='fs-actions';
+        fsActions.innerHTML=`<div>👍</div><div>💬</div><div>🔗</div>`;
+        fsCard.appendChild(fsActions);
+        fsContainer.appendChild(fsCard);
+
+        // Klik grid → munculin fullscreen
+        card.addEventListener('click', ()=>{
+          fsContainer.style.display='block';
+          // Scroll fullscreen ke video yg diklik
+          fsCard.scrollIntoView({behavior:'auto'});
+          fsVid.play();
+        });
+      }
+    }
+
+    // Autoplay saat fullscreen discroll
+    const fsVideos = document.querySelectorAll('.fs-video-card video');
+    const observer = new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          entry.target.play();
+        } else {
+          entry.target.pause();
+        }
+      });
+    }, { threshold:0.7 });
+    fsVideos.forEach(v=>observer.observe(v));
+
+  } catch(e){
+    console.log('Folder picker dibatalkan', e);
+  }
+});
+
+// Klik fullscreen overlay → close
+fsContainer.addEventListener('click', e=>{
+  if(e.target===fsContainer){
+    fsContainer.style.display='none';
+    const vids = fsContainer.querySelectorAll('video');
+    vids.forEach(v=>v.pause());
+  }
+});
+</script>
+</body>
+</html>
