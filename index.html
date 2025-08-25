@@ -8,125 +8,119 @@
 <title>Video Grid + Fullscreen Scrollable</title>
 <style>
 body, html {
-  margin:0;
-  padding:0;
-  background:#000;
-  color:#fff;
-  font-family: Arial, sans-serif;
-  height:100%;
-  overflow-y:auto;
-  scroll-behavior: smooth;
+  margin:0; padding:0; background:#000; color:#fff;
+  font-family: Arial, sans-serif; height:100%;
+  overflow-y:auto; scroll-behavior: smooth;
 }
 
-/* Grid 3 kolom awal */
 .grid-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap:5px;
-  padding:5px;
+  display:grid; grid-template-columns: repeat(3, 1fr);
+  gap:5px; padding:5px;
 }
 
 .video-card {
-  position: relative;
-  background:#111;
-  border-radius:8px;
-  overflow:hidden;
-  height:200px;
-  cursor:pointer;
+  position: relative; background:#111; border-radius:8px;
+  overflow:hidden; height:200px; cursor:pointer;
 }
 
-.video-card video {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
+.video-card video { width:100%; height:100%; object-fit:cover; }
 
 .video-title {
-  position:absolute;
-  top:5px;
-  left:5px;
-  font-size:14px;
-  font-weight:bold;
-  color:#fff;
-  text-shadow:0 0 5px #000;
-  z-index:2;
+  position:absolute; top:5px; left:5px; font-size:14px; font-weight:bold;
+  color:#fff; text-shadow:0 0 5px #000; z-index:2;
 }
 
-/* Fullscreen overlay scrollable ala Shorts */
 .fullscreen-container {
-  display:none;
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:#000;
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
   overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  z-index:1000;
+  scroll-snap-type: y mandatory; /* snap vertikal */
+  z-index: 1000;
 }
 
+.fs-item {
+  height: 100vh;             /* satu layar penuh */
+  scroll-snap-align: start;  /* berhenti pas awal item */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* biar video di tengah */
+  padding: 20px 0;
+}
+
+.fs-item video {
+  max-height: 80%;  /* kasih ruang atas-bawah */
+  margin: auto;
+  border-radius: 12px;
+}
+
+.fullscreen-body {
+  scroll-snap-align: start;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 0; /* ruang atas bawah */
+  box-sizing: border-box;
+}
+
+.fullscreen-body video {
+  max-height: 80vh; /* biar ada space di bawah */
+  width: auto;
+  border-radius: 8px;
+}
 .fs-video-card {
   position: relative;
-  width:100%;
-  height:100vh;
-  scroll-snap-align:start;
-  background:#000;
-  overflow:hidden;
+  width: 100%;
+  min-height: 100vh;   /* ganti height jadi min-height */
+  scroll-snap-align: start;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;     /* kasih ruang atas bawah */
+  box-sizing: border-box;
 }
 
 .fs-video-card video {
-  width:100%;
-  height:100%;
-  object-fit:cover;
+  max-height: 80vh;   /* biar video ga nutup semua layar */
+  width: auto;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .fs-title {
-  position:absolute;
-  bottom:80px;
-  left:10px;
-  font-size:20px;
-  font-weight:bold;
-  color:#fff;
-  text-shadow:0 0 5px #000;
-  z-index:2;
+  position:absolute; bottom:40px; left:15px;
+  font-size:20px; font-weight:bold; color:#fff;
+  text-shadow:0 0 5px #000; z-index:2; pointer-events:none;
 }
 
-.fs-actions {
-  position:absolute;
-  bottom:20px;
-  right:10px;
-  display:flex;
-  flex-direction:column;
-  gap:15px;
-  z-index:2;
+.fs-back-btn {
+  position: absolute;
+  top: 15px; /* tambah jarak dari atas */
+  left: 10px;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(6px); /* biar lebih modern */
 }
 
-.fs-actions div {
-  width:50px;
-  height:50px;
-  background: rgba(255,255,255,0.2);
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
-  font-size:24px;
+.fs-pause-btn {
+  position:absolute; inset:0; margin:auto; width:100px; height:100px;
+  border:none; border-radius:50%; background:transparent;
+  color:#fff; font-size:40px; cursor:pointer; z-index:3;
 }
 
-/* Tombol + folder */
 #folderBtn {
-  position:fixed;
-  top:10px;
-  right:10px;
-  font-size:24px;
-  padding:5px 10px;
-  cursor:pointer;
-  background:rgba(255,255,255,0.1);
-  border:none;
-  color:#fff;
-  border-radius:5px;
-  z-index:1001;
+  position:fixed; top:10px; right:10px; font-size:24px;
+  padding:5px 10px; cursor:pointer; background:rgba(255,255,255,0.1);
+  border:none; color:#fff; border-radius:5px; z-index:1001;
 }
 </style>
 </head>
@@ -135,8 +129,8 @@ body, html {
 <div class="grid-container" id="gridContainer"></div>
 <button id="folderBtn">+</button>
 
-<!-- Fullscreen overlay -->
-<div class="fullscreen-container" id="fsContainer"></div>
+<div class="fullscreen-container" id="fsContainer">
+    <div class="fs-item"></div></div>
 
 <script>
 const gridContainer = document.getElementById('gridContainer');
@@ -154,50 +148,71 @@ folderBtn.addEventListener('click', async () => {
         const file = await entry.getFile();
         const url = URL.createObjectURL(file);
 
-        // GRID 3 kolom
+        // nama file tanpa .mp4
+        const cleanName = entry.name.replace(/\.mp4$/i,'');
+
+        // Grid card
         const card = document.createElement('div');
         card.className='video-card';
         const vid = document.createElement('video');
-        vid.src=url;
-        vid.loop=true;
-        vid.muted=true;
+        vid.src=url; vid.loop=true; vid.muted=true;
         card.appendChild(vid);
         const title = document.createElement('div');
         title.className='video-title';
-        title.textContent=entry.name;
+        title.textContent=cleanName;
         card.appendChild(title);
         gridContainer.appendChild(card);
 
-        // FULLSCREEN ala Shorts
+        // Fullscreen card
         const fsCard = document.createElement('div');
         fsCard.className='fs-video-card';
         const fsVid = document.createElement('video');
-        fsVid.src=url;
-        fsVid.loop=true;
-        fsVid.muted=false;
-        fsVid.playsInline=true;
+        fsVid.src=url; fsVid.loop=true; fsVid.muted=false; fsVid.playsInline=true;
         fsCard.appendChild(fsVid);
+
         const fsTitle = document.createElement('div');
         fsTitle.className='fs-title';
-        fsTitle.textContent=entry.name;
+        fsTitle.textContent=cleanName;
         fsCard.appendChild(fsTitle);
-        const fsActions = document.createElement('div');
-        fsActions.className='fs-actions';
-        fsActions.innerHTML=`<div>👍</div><div>💬</div><div>🔗</div>`;
-        fsCard.appendChild(fsActions);
+
+        // Tombol back
+        const backBtn = document.createElement('button');
+        backBtn.className='fs-back-btn';
+        backBtn.textContent='️❌';
+        backBtn.addEventListener('click', e=>{
+          e.stopPropagation();
+          closeFullscreen();
+        });
+        fsCard.appendChild(backBtn);
+
+        // Tombol pause/play tengah
+        const pauseBtn = document.createElement('button');
+        pauseBtn.className='fs-pause-btn';
+        pauseBtn.textContent=''; 
+        pauseBtn.addEventListener('click', e=>{
+          e.stopPropagation();
+          if(fsVid.paused){
+            fsVid.play();
+            pauseBtn.textContent='';
+          } else {
+            fsVid.pause();
+            pauseBtn.textContent='▶';
+          }
+        });
+        fsCard.appendChild(pauseBtn);
+
         fsContainer.appendChild(fsCard);
 
-        // Klik grid → munculin fullscreen
+        // Klik grid → fullscreen
         card.addEventListener('click', ()=>{
           fsContainer.style.display='block';
-          // Scroll fullscreen ke video yg diklik
           fsCard.scrollIntoView({behavior:'auto'});
           fsVid.play();
         });
       }
     }
 
-    // Autoplay saat fullscreen discroll
+    // IntersectionObserver untuk autoplay scroll
     const fsVideos = document.querySelectorAll('.fs-video-card video');
     const observer = new IntersectionObserver(entries=>{
       entries.forEach(entry=>{
@@ -207,7 +222,7 @@ folderBtn.addEventListener('click', async () => {
           entry.target.pause();
         }
       });
-    }, { threshold:0.7 });
+    }, {threshold:0.7});
     fsVideos.forEach(v=>observer.observe(v));
 
   } catch(e){
@@ -215,14 +230,9 @@ folderBtn.addEventListener('click', async () => {
   }
 });
 
-// Klik fullscreen overlay → close
-fsContainer.addEventListener('click', e=>{
-  if(e.target===fsContainer){
-    fsContainer.style.display='none';
-    const vids = fsContainer.querySelectorAll('video');
-    vids.forEach(v=>v.pause());
-  }
-});
+function closeFullscreen(){
+  fsContainer.style.display='none';
+}
 </script>
 </body>
 </html>
