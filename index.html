@@ -40,52 +40,20 @@ body, html {
   z-index: 1000;
 }
 
-.fs-item {
-  height: 100vh;             /* satu layar penuh */
-  scroll-snap-align: start;  /* berhenti pas awal item */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;   /* biar video di tengah */
-  padding: 20px 0;
-}
-
-.fs-item video {
-  max-height: 80%;  /* kasih ruang atas-bawah */
-  margin: auto;
-  border-radius: 12px;
-}
-
-.fullscreen-body {
-  scroll-snap-align: start;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 40px 0; /* ruang atas bawah */
-  box-sizing: border-box;
-}
-
-.fullscreen-body video {
-  max-height: 80vh; /* biar ada space di bawah */
-  width: auto;
-  border-radius: 8px;
-}
 .fs-video-card {
   position: relative;
   width: 100%;
-  min-height: 100vh;   /* ganti height jadi min-height */
+  min-height: 100vh;
   scroll-snap-align: start;
   background: #000;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 40px 0;     /* kasih ruang atas bawah */
-  box-sizing: border-box;
 }
 
 .fs-video-card video {
-  max-height: 80vh;   /* biar video ga nutup semua layar */
+  max-height: 100vh;
   width: auto;
   object-fit: contain;
   border-radius: 8px;
@@ -99,7 +67,7 @@ body, html {
 
 .fs-back-btn {
   position: absolute;
-  top: 15px; /* tambah jarak dari atas */
+  top: 15px;
   left: 10px;
   z-index: 3;
   background: rgba(255, 255, 255, 0.15);
@@ -108,7 +76,7 @@ body, html {
   padding: 10px 14px;
   border-radius: 999px;
   cursor: pointer;
-  backdrop-filter: blur(6px); /* biar lebih modern */
+  backdrop-filter: blur(6px);
 }
 
 .fs-pause-btn {
@@ -129,13 +97,35 @@ body, html {
 <div class="grid-container" id="gridContainer"></div>
 <button id="folderBtn">+</button>
 
-<div class="fullscreen-container" id="fsContainer">
-    <div class="fs-item"></div></div>
+<div class="fullscreen-container" id="fsContainer"></div>
 
 <script>
 const gridContainer = document.getElementById('gridContainer');
 const folderBtn = document.getElementById('folderBtn');
 const fsContainer = document.getElementById('fsContainer');
+
+// Buka fullscreen + pushState
+function openFullscreen(fsCard, fsVid){
+  fsContainer.style.display='block';
+  fsCard.scrollIntoView({behavior:'auto'});
+  fsVid.play();
+  history.pushState({fullscreen:true}, null, "");
+}
+
+// Tutup fullscreen + rollback history
+function closeFullscreen(){
+  fsContainer.style.display='none';
+  if(history.state && history.state.fullscreen){
+    history.back();
+  }
+}
+
+// Intercept tombol back HP
+window.addEventListener('popstate', function(e){
+  if(fsContainer.style.display==='block'){
+    closeFullscreen();
+  }
+});
 
 folderBtn.addEventListener('click', async () => {
   try {
@@ -148,7 +138,6 @@ folderBtn.addEventListener('click', async () => {
         const file = await entry.getFile();
         const url = URL.createObjectURL(file);
 
-        // nama file tanpa .mp4
         const cleanName = entry.name.replace(/\.mp4$/i,'');
 
         // Grid card
@@ -175,10 +164,10 @@ folderBtn.addEventListener('click', async () => {
         fsTitle.textContent=cleanName;
         fsCard.appendChild(fsTitle);
 
-        // Tombol back
+        // Tombol back ❌
         const backBtn = document.createElement('button');
         backBtn.className='fs-back-btn';
-        backBtn.textContent='️❌';
+        backBtn.textContent='';
         backBtn.addEventListener('click', e=>{
           e.stopPropagation();
           closeFullscreen();
@@ -188,7 +177,7 @@ folderBtn.addEventListener('click', async () => {
         // Tombol pause/play tengah
         const pauseBtn = document.createElement('button');
         pauseBtn.className='fs-pause-btn';
-        pauseBtn.textContent=''; 
+        pauseBtn.textContent='';
         pauseBtn.addEventListener('click', e=>{
           e.stopPropagation();
           if(fsVid.paused){
@@ -205,14 +194,12 @@ folderBtn.addEventListener('click', async () => {
 
         // Klik grid → fullscreen
         card.addEventListener('click', ()=>{
-          fsContainer.style.display='block';
-          fsCard.scrollIntoView({behavior:'auto'});
-          fsVid.play();
+          openFullscreen(fsCard, fsVid);
         });
       }
     }
 
-    // IntersectionObserver untuk autoplay scroll
+    // Autoplay scroll
     const fsVideos = document.querySelectorAll('.fs-video-card video');
     const observer = new IntersectionObserver(entries=>{
       entries.forEach(entry=>{
@@ -229,10 +216,7 @@ folderBtn.addEventListener('click', async () => {
     console.log('Folder picker dibatalkan', e);
   }
 });
-
-function closeFullscreen(){
-  fsContainer.style.display='none';
-}
 </script>
+
 </body>
 </html>
