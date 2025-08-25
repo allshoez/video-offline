@@ -36,7 +36,7 @@ body, html {
   inset: 0;
   background: #000;
   overflow-y: scroll;
-  scroll-snap-type: y mandatory; /* snap vertikal */
+  scroll-snap-type: y mandatory;
   z-index: 1000;
 }
 
@@ -85,26 +85,108 @@ body, html {
   color:#fff; font-size:40px; cursor:pointer; z-index:3;
 }
 
-#folderBtn {
-  position:fixed; top:10px; right:10px; font-size:24px;
-  padding:5px 10px; cursor:pointer; background:rgba(255,255,255,0.1);
+/* Tombol menu */
+#menuBtn {
+  position:fixed; top:10px; right:10px; font-size:20px;
+  padding:3px 5px; cursor:pointer; background:rgba(255,255,255,0.1);
   border:none; color:#fff; border-radius:5px; z-index:1001;
+}
+
+/* Overlay popup */
+.popup {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4);
+  z-index: 1500;
+}
+
+/* Isi popup */
+.popup-content {
+  background: #fff;
+  width: 300px;
+  margin: 15% auto;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  text-align: center;
+  color:#000;
+}
+
+.popup-content h3 {
+  margin-top: 0;
+}
+
+.popup-content button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: none;
+  border-radius: 5px;
+  background: #007bff;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.closeBtn {
+  background: #dc3545;
+}
+header {
+  width: 100%;
+  background: #333; /* abu gelap */
+  color: #fff;
+  padding: 30px;
+  text-align: center;
+  font-size: 18px;
 }
 </style>
 </head>
 <body>
+  <header>
+<button id="menuBtn">+</button></header>
+
 
 <div class="grid-container" id="gridContainer"></div>
-<button id="folderBtn">+</button>
+
+<!-- Popup -->
+<div id="popup" class="popup">
+  <div class="popup-content">
+    <h3>Pilih Aksi</h3>
+    <button id="folderBtn">Masukin File</button>
+<button onclick="window.location='online'">Video Online</button>
+    <button class="closeBtn" id="closePopup">Tutup</button>
+  </div>
+</div>
 
 <div class="fullscreen-container" id="fsContainer"></div>
 
 <script>
 const gridContainer = document.getElementById('gridContainer');
-const folderBtn = document.getElementById('folderBtn');
 const fsContainer = document.getElementById('fsContainer');
 
-// Buka fullscreen + pushState
+// ---------------- Popup Menu ----------------
+const menuBtn = document.getElementById('menuBtn');
+const popup = document.getElementById('popup');
+const closePopup = document.getElementById('closePopup');
+
+menuBtn.addEventListener('click', () => {
+  popup.style.display = 'block';
+});
+
+closePopup.addEventListener('click', () => {
+  popup.style.display = 'none';
+});
+
+window.addEventListener('click', (e) => {
+  if (e.target === popup) {
+    popup.style.display = 'none';
+  }
+});
+
+// ---------------- Fullscreen Player ----------------
 function openFullscreen(fsCard, fsVid){
   fsContainer.style.display='block';
   fsCard.scrollIntoView({behavior:'auto'});
@@ -112,7 +194,6 @@ function openFullscreen(fsCard, fsVid){
   history.pushState({fullscreen:true}, null, "");
 }
 
-// Tutup fullscreen + rollback history
 function closeFullscreen(){
   fsContainer.style.display='none';
   if(history.state && history.state.fullscreen){
@@ -120,14 +201,16 @@ function closeFullscreen(){
   }
 }
 
-// Intercept tombol back HP
 window.addEventListener('popstate', function(e){
   if(fsContainer.style.display==='block'){
     closeFullscreen();
   }
 });
 
+// ---------------- Masukin File ----------------
+const folderBtn = document.getElementById('folderBtn');
 folderBtn.addEventListener('click', async () => {
+  popup.style.display='none'; // nutup popup
   try {
     const dirHandle = await window.showDirectoryPicker();
     gridContainer.innerHTML='';
@@ -137,10 +220,8 @@ folderBtn.addEventListener('click', async () => {
       if(entry.kind==='file' && entry.name.endsWith('.mp4')){
         const file = await entry.getFile();
         const url = URL.createObjectURL(file);
-
         const cleanName = entry.name.replace(/\.mp4$/i,'');
 
-        // Grid card
         const card = document.createElement('div');
         card.className='video-card';
         const vid = document.createElement('video');
@@ -152,7 +233,6 @@ folderBtn.addEventListener('click', async () => {
         card.appendChild(title);
         gridContainer.appendChild(card);
 
-        // Fullscreen card
         const fsCard = document.createElement('div');
         fsCard.className='fs-video-card';
         const fsVid = document.createElement('video');
@@ -164,25 +244,20 @@ folderBtn.addEventListener('click', async () => {
         fsTitle.textContent=cleanName;
         fsCard.appendChild(fsTitle);
 
-        // Tombol back ❌
         const backBtn = document.createElement('button');
         backBtn.className='fs-back-btn';
-        backBtn.textContent='';
         backBtn.addEventListener('click', e=>{
           e.stopPropagation();
           closeFullscreen();
         });
         fsCard.appendChild(backBtn);
 
-        // Tombol pause/play tengah
         const pauseBtn = document.createElement('button');
         pauseBtn.className='fs-pause-btn';
-        pauseBtn.textContent='';
         pauseBtn.addEventListener('click', e=>{
           e.stopPropagation();
           if(fsVid.paused){
             fsVid.play();
-            pauseBtn.textContent='';
           } else {
             fsVid.pause();
             pauseBtn.textContent='▶';
@@ -192,14 +267,12 @@ folderBtn.addEventListener('click', async () => {
 
         fsContainer.appendChild(fsCard);
 
-        // Klik grid → fullscreen
         card.addEventListener('click', ()=>{
           openFullscreen(fsCard, fsVid);
         });
       }
     }
 
-    // Autoplay scroll
     const fsVideos = document.querySelectorAll('.fs-video-card video');
     const observer = new IntersectionObserver(entries=>{
       entries.forEach(entry=>{
@@ -217,6 +290,5 @@ folderBtn.addEventListener('click', async () => {
   }
 });
 </script>
-
 </body>
 </html>
