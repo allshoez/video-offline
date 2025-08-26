@@ -3,14 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#000000">
-<title>Video Grid + Fullscreen Scrollable</title>
+<title>Video Folder Grid</title>
 <style>
 body, html {
   margin:0; padding:0; background:#000; color:#fff;
   font-family: Arial, sans-serif; height:100%;
   overflow-y:auto; scroll-behavior: smooth;
+}
+
+#folderBar {
+  display:flex; overflow-x:auto; white-space:nowrap;
+  padding:10px; background:#111; border-bottom:1px solid #444;
+}
+
+.folder-btn {
+  display:inline-block; padding:10px 20px; margin-right:5px;
+  background:#222; border-radius:8px; cursor:pointer;
+  flex:0 0 auto; white-space:nowrap;
+}
+
+.folder-btn.active {
+  background:#007bff;
+  color:#fff;
 }
 
 .grid-container {
@@ -53,14 +67,14 @@ body, html {
 }
 
 .fs-video-card video {
-  max-height: 100vh;
+  max-height: 90vh;
   width: auto;
   object-fit: contain;
   border-radius: 8px;
 }
 
 .fs-title {
-  position:absolute; bottom:40px; left:15px;
+  position:absolute; bottom:80px; left:15px;
   font-size:20px; font-weight:bold; color:#fff;
   text-shadow:0 0 5px #000; z-index:2; pointer-events:none;
 }
@@ -85,14 +99,14 @@ body, html {
   color:#fff; font-size:40px; cursor:pointer; z-index:3;
 }
 
-/* Tombol menu */
+/* Tombol menu popup */
 #menuBtn {
   position:fixed; top:10px; right:10px; font-size:20px;
   padding:3px 5px; cursor:pointer; background:rgba(255,255,255,0.1);
   border:none; color:#fff; border-radius:5px; z-index:1001;
 }
 
-/* Overlay popup */
+/* Popup */
 .popup {
   display: none;
   position: fixed;
@@ -102,7 +116,6 @@ body, html {
   z-index: 1500;
 }
 
-/* Isi popup */
 .popup-content {
   background: #fff;
   width: 300px;
@@ -114,9 +127,7 @@ body, html {
   color:#000;
 }
 
-.popup-content h3 {
-  margin-top: 0;
-}
+.popup-content h3 { margin-top: 0; }
 
 .popup-content button {
   display: block;
@@ -131,12 +142,11 @@ body, html {
   font-size: 16px;
 }
 
-.closeBtn {
-  background: #dc3545;
-}
+.closeBtn { background: #dc3545; }
+
 header {
   width: 100%;
-  background: #333; /* abu gelap */
+  background: #333;
   color: #fff;
   padding: 30px;
   text-align: center;
@@ -145,150 +155,175 @@ header {
 </style>
 </head>
 <body>
-  <header>
-<button id="menuBtn">+</button></header>
 
+<header>
+  <button id="menuBtn">+</button>
+</header>
 
+<div id="folderBar"></div>
 <div class="grid-container" id="gridContainer"></div>
+<div class="fullscreen-container" id="fsContainer"></div>
 
-<!-- Popup -->
 <div id="popup" class="popup">
   <div class="popup-content">
     <h3>Pilih Aksi</h3>
     <button id="folderBtn">Masukin File</button>
-<button onclick="window.location='online'">Video Online</button>
+    <button onclick="window.location='online'">Video Online</button>
     <button class="closeBtn" id="closePopup">Tutup</button>
   </div>
 </div>
 
-<div class="fullscreen-container" id="fsContainer"></div>
-
 <script>
+const folderBar = document.getElementById('folderBar');
 const gridContainer = document.getElementById('gridContainer');
 const fsContainer = document.getElementById('fsContainer');
-
-// ---------------- Popup Menu ----------------
 const menuBtn = document.getElementById('menuBtn');
 const popup = document.getElementById('popup');
 const closePopup = document.getElementById('closePopup');
 
-menuBtn.addEventListener('click', () => {
-  popup.style.display = 'block';
+menuBtn.addEventListener('click', ()=> popup.style.display='block');
+closePopup.addEventListener('click', ()=> popup.style.display='none');
+window.addEventListener('click', (e)=> { if(e.target===popup) popup.style.display='none'; });
+
+let folders = {}; // {folderName: [fileEntry,...]}
+let allVideos = []; // array global untuk semua video
+
+function registerVideo(vid){
+  allVideos.push(vid);
+  vid.addEventListener('play', ()=>{
+    allVideos.forEach(v=>{
+      if(v !== vid) v.pause();
+    });
+  });
+}
+
+// ---------------- Folder Picker ----------------
+document.getElementById('folderBtn').addEventListener('click', async ()=>{
+  popup.style.display='none';
+  try{
+    const dirHandle = await window.showDirectoryPicker();
+    folders = {};
+    gridContainer.innerHTML='';
+    folderBar.innerHTML='';
+    fsContainer.innerHTML='';
+
+    for await (const entry of dirHandle.values()){
+      if(entry.kind==='directory'){
+        await loadFolderFiles(entry);
+      } else if(entry.kind==='file' && entry.name.endsWith('.mp4')){
+        if(!folders['Root']) folders['Root']=[];
+        folders['Root'].push(entry);
+      }
+    }
+
+    renderFolderButtons();
+    if(Object.keys(folders).length>0) showFolder(Object.keys(folders)[0]);
+
+  } catch(e){ console.log('Folder picker dibatalkan', e); }
 });
 
-closePopup.addEventListener('click', () => {
-  popup.style.display = 'none';
-});
-
-window.addEventListener('click', (e) => {
-  if (e.target === popup) {
-    popup.style.display = 'none';
+// ---------------- Load Folder Files ----------------
+async function loadFolderFiles(dirHandle){
+  const files = [];
+  for await(const entry of dirHandle.values()){
+    if(entry.kind==='file' && entry.name.endsWith('.mp4')) files.push(entry);
   }
-});
+  if(files.length>0) folders[dirHandle.name] = files;
+}
 
-// ---------------- Fullscreen Player ----------------
+// ---------------- Render Folder Buttons ----------------
+function renderFolderButtons(){
+  folderBar.innerHTML='';
+  Object.keys(folders).forEach((folderName, idx)=>{
+    const btn = document.createElement('div');
+    btn.className='folder-btn';
+    if(idx===0) btn.classList.add('active');
+    btn.textContent=folderName;
+    btn.addEventListener('click', ()=> showFolder(folderName, btn));
+    folderBar.appendChild(btn);
+  });
+}
+
+// ---------------- Show Folder Videos ----------------
+async function showFolder(folderName, btn=null){
+  gridContainer.innerHTML='';
+  if(btn){
+    document.querySelectorAll('.folder-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  for(const entry of folders[folderName]){
+    const file = await entry.getFile();
+    const url = URL.createObjectURL(file);
+    const cleanName = entry.name.replace(/\.mp4$/i,'');
+
+    const card = document.createElement('div');
+    card.className='video-card';
+    const vid = document.createElement('video');
+    vid.src=url; vid.loop=true; vid.muted=true;
+    card.appendChild(vid);
+    const title = document.createElement('div');
+    title.className='video-title';
+    title.textContent=cleanName;
+    card.appendChild(title);
+    gridContainer.appendChild(card);
+
+    const fsCard = document.createElement('div');
+    fsCard.className='fs-video-card';
+    const fsVid = document.createElement('video');
+    fsVid.src=url; fsVid.loop=true; fsVid.muted=false; fsVid.playsInline=true;
+    fsCard.appendChild(fsVid);
+
+    const fsTitle = document.createElement('div');
+    fsTitle.className='fs-title';
+    fsTitle.textContent=cleanName;
+    fsCard.appendChild(fsTitle);
+
+    const backBtn = document.createElement('button');
+    backBtn.className='fs-back-btn';
+    backBtn.addEventListener('click', e=>{ e.stopPropagation(); closeFullscreen(); });
+    fsCard.appendChild(backBtn);
+
+    const pauseBtn = document.createElement('button');
+    pauseBtn.className='fs-pause-btn';
+    pauseBtn.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(fsVid.paused) fsVid.play();
+      else { fsVid.pause(); pauseBtn.textContent='▶'; }
+    });
+    fsCard.appendChild(pauseBtn);
+
+    fsContainer.appendChild(fsCard);
+
+    // register semua video untuk auto-pause
+    registerVideo(vid);
+    registerVideo(fsVid);
+
+    card.addEventListener('click', ()=>openFullscreen(fsCard, fsVid));
+  }
+
+  const fsVideos = document.querySelectorAll('.fs-video-card video');
+  const observer = new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting) entry.target.play();
+      else entry.target.pause();
+    });
+  }, {threshold:0.7});
+  fsVideos.forEach(v=>observer.observe(v));
+}
+
+// ---------------- Fullscreen ----------------
 function openFullscreen(fsCard, fsVid){
   fsContainer.style.display='block';
   fsCard.scrollIntoView({behavior:'auto'});
   fsVid.play();
   history.pushState({fullscreen:true}, null, "");
 }
-
 function closeFullscreen(){
   fsContainer.style.display='none';
-  if(history.state && history.state.fullscreen){
-    history.back();
-  }
+  if(history.state && history.state.fullscreen) history.back();
 }
+window.addEventListener('popstate', function(e){ if(fsContainer.style.display==='block') closeFullscreen(); });
 
-window.addEventListener('popstate', function(e){
-  if(fsContainer.style.display==='block'){
-    closeFullscreen();
-  }
-});
-
-// ---------------- Masukin File ----------------
-const folderBtn = document.getElementById('folderBtn');
-folderBtn.addEventListener('click', async () => {
-  popup.style.display='none'; // nutup popup
-  try {
-    const dirHandle = await window.showDirectoryPicker();
-    gridContainer.innerHTML='';
-    fsContainer.innerHTML='';
-
-    for await (const entry of dirHandle.values()){
-      if(entry.kind==='file' && entry.name.endsWith('.mp4')){
-        const file = await entry.getFile();
-        const url = URL.createObjectURL(file);
-        const cleanName = entry.name.replace(/\.mp4$/i,'');
-
-        const card = document.createElement('div');
-        card.className='video-card';
-        const vid = document.createElement('video');
-        vid.src=url; vid.loop=true; vid.muted=true;
-        card.appendChild(vid);
-        const title = document.createElement('div');
-        title.className='video-title';
-        title.textContent=cleanName;
-        card.appendChild(title);
-        gridContainer.appendChild(card);
-
-        const fsCard = document.createElement('div');
-        fsCard.className='fs-video-card';
-        const fsVid = document.createElement('video');
-        fsVid.src=url; fsVid.loop=true; fsVid.muted=false; fsVid.playsInline=true;
-        fsCard.appendChild(fsVid);
-
-        const fsTitle = document.createElement('div');
-        fsTitle.className='fs-title';
-        fsTitle.textContent=cleanName;
-        fsCard.appendChild(fsTitle);
-
-        const backBtn = document.createElement('button');
-        backBtn.className='fs-back-btn';
-        backBtn.addEventListener('click', e=>{
-          e.stopPropagation();
-          closeFullscreen();
-        });
-        fsCard.appendChild(backBtn);
-
-        const pauseBtn = document.createElement('button');
-        pauseBtn.className='fs-pause-btn';
-        pauseBtn.addEventListener('click', e=>{
-          e.stopPropagation();
-          if(fsVid.paused){
-            fsVid.play();
-          } else {
-            fsVid.pause();
-            pauseBtn.textContent='▶';
-          }
-        });
-        fsCard.appendChild(pauseBtn);
-
-        fsContainer.appendChild(fsCard);
-
-        card.addEventListener('click', ()=>{
-          openFullscreen(fsCard, fsVid);
-        });
-      }
-    }
-
-    const fsVideos = document.querySelectorAll('.fs-video-card video');
-    const observer = new IntersectionObserver(entries=>{
-      entries.forEach(entry=>{
-        if(entry.isIntersecting){
-          entry.target.play();
-        } else {
-          entry.target.pause();
-        }
-      });
-    }, {threshold:0.7});
-    fsVideos.forEach(v=>observer.observe(v));
-
-  } catch(e){
-    console.log('Folder picker dibatalkan', e);
-  }
-});
 </script>
 </body>
 </html>
