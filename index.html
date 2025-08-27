@@ -284,11 +284,17 @@ async function showFolder(folderName, btn=null){
     fsCard.appendChild(backBtn);
 
     const pauseBtn = document.createElement('button');
-    pauseBtn.className='fs-pause-btn';
-    pauseBtn.addEventListener('click', e=>{
-      e.stopPropagation();
-      if(fsVid.paused) fsVid.play();
-      else { fsVid.pause(); pauseBtn.textContent='▶'; }
+pauseBtn.className = 'fs-pause-btn';
+
+pauseBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (fsVid.paused) {
+    fsVid.play();
+    pauseBtn.textContent = ''; // kosongkan icon saat play
+  } else {
+    fsVid.pause();
+    pauseBtn.textContent = ' ▶'; // tampilkan pause saat pause
+  }
     });
     fsCard.appendChild(pauseBtn);
 
