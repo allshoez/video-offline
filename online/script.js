@@ -11,6 +11,9 @@ const showCacheBtn = document.getElementById("showCache");
 const cacheList = document.getElementById("cacheList");
 let overlayContent = null;
 
+// Global array untuk semua URL video
+let videoURLs = [];
+
 // --- IndexedDB setup ---
 let db;
 const request = indexedDB.open("videoCacheDB", 1);
@@ -23,7 +26,7 @@ request.onupgradeneeded = e => {
 
 request.onsuccess = e => {
   db = e.target.result;
-  loadVideoList();
+  loadVideoList(); // load semua video dari DB
 };
 
 request.onerror = e => console.error("IndexedDB error", e);
@@ -46,10 +49,10 @@ function getCachedVideo(url){
 }
 
 // --- Video list persistence ---
-function saveVideoList(urls){
+function saveVideoList(){
   if(!db) return;
   const tx = db.transaction("videoList","readwrite");
-  tx.objectStore("videoList").put({id:1, urls});
+  tx.objectStore("videoList").put({id:1, urls: videoURLs});
 }
 
 function loadVideoList(){
@@ -58,7 +61,7 @@ function loadVideoList(){
   const req = tx.objectStore("videoList").get(1);
   req.onsuccess = () => {
     const urls = req.result?.urls || [];
-    urls.forEach(url => addVideoToGrid(url));
+    urls.forEach(url => addVideoToGrid(url, false));
   };
 }
 
@@ -72,12 +75,8 @@ addBtn.onclick = () => {
   if(links.length===0) return;
 
   links.forEach(url=>{
-    addVideoToGrid(url);
+    addVideoToGrid(url, true);
   });
-
-  // update DB setelah video ditambahkan
-  const currentUrls = Array.from(grid.children).map(c=>c.dataset.url);
-  saveVideoList(currentUrls);
 
   textarea.value="";
   sidebar.style.right="-320px";
@@ -94,8 +93,9 @@ closeOverlayBtn.onclick = () => {
 };
 
 // --- Tambah video ke grid ---
-function addVideoToGrid(url){
-  if(Array.from(grid.children).some(c=>c.dataset.url===url)) return;
+// simpanToDB = true jika ingin disimpan ke DB (bukan saat load dari DB)
+function addVideoToGrid(url, simpanToDB){
+  if(videoURLs.includes(url)) return;
 
   const container = document.createElement("div");
   container.className = "video-container";
@@ -127,7 +127,13 @@ function addVideoToGrid(url){
     }
     overlay.appendChild(overlayContent);
   };
+
   grid.appendChild(container);
+
+  if(simpanToDB){
+    videoURLs.push(url);
+    saveVideoList();
+  }
 }
 
 // --- Debug cache di sidebar ---
