@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Grid Persist + Hapus</title>
+<title>Video Grid Persist</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#111;color:#fff;}
 header{background:#222;padding:10px;display:flex;justify-content:flex-end;}
 header button{padding:8px 12px;background:#0f0;color:#000;border:none;cursor:pointer;}
 #videosGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;padding:15px;}
 .video-container{position:relative;border:1px solid #444;height:180px;display:flex;justify-content:center;align-items:center;background:#000;cursor:pointer;overflow:hidden;}
-.video-container button.delete-btn{position:absolute;top:5px;right:5px;padding:2px 5px;background:red;color:#fff;border:none;cursor:pointer;z-index:10;font-size:12px;}
+.video-container button.delete-btn{position:absolute;top:5px;right:5px;padding:2px 5px;background:red;color:#fff;border:none;z-index:10;font-size:12px;cursor:pointer;}
 #sidebar{position:fixed;top:0;right:-320px;width:300px;height:100%;background:#222;padding:15px;box-sizing:border-box;transition:0.3s;display:flex;flex-direction:column;z-index:20;}
 #sidebar textarea{width:100%;height:80px;margin-bottom:10px;padding:5px;}
 #sidebar button{padding:8px;background:#0f0;color:#000;border:none;cursor:pointer;}
@@ -20,7 +20,6 @@ header button{padding:8px 12px;background:#0f0;color:#000;border:none;cursor:poi
 </style>
 </head>
 <body>
-
 <header>
   <button id="toggleSidebar">Tambah Video</button>
 </header>
@@ -39,118 +38,6 @@ header button{padding:8px 12px;background:#0f0;color:#000;border:none;cursor:poi
   <button id="closeOverlay">X</button>
 </div>
 
-<script>
-const grid = document.getElementById("videosGrid");
-const sidebar = document.getElementById("sidebar");
-const toggleSidebarBtn = document.getElementById("toggleSidebar");
-const closeSidebarBtn = document.getElementById("closeSidebar");
-const addBtn = document.getElementById("addVideos");
-const textarea = document.getElementById("videoLinks");
-const overlay = document.getElementById("overlayVideo");
-const closeOverlayBtn = document.getElementById("closeOverlay");
-
-let videoURLs = [];
-
-// --- Sidebar toggle ---
-toggleSidebarBtn.onclick = () => { sidebar.style.right="0"; };
-closeSidebarBtn.onclick = () => { sidebar.style.right="-320px"; };
-
-// --- Overlay ---
-closeOverlayBtn.onclick = () => {
-  overlay.style.display="none";
-  overlay.innerHTML = '<button id="closeOverlay">X</button>';
-};
-
-// --- Generate embed berdasarkan URL ---
-function generateEmbed(url){
-  let embed;
-  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
-  if(ytMatch){
-    embed = document.createElement("iframe");
-    embed.src = `https://www.youtube.com/embed/${ytMatch[1]}`;
-    embed.allowFullscreen = true;
-  } else if(url.includes("drive.google.com")){
-    let fileId = url.match(/\/d\/(.*?)\//)?.[1] || url.match(/id=(.*)/)?.[1];
-    if(fileId){
-      embed = document.createElement("iframe");
-      embed.src = `https://drive.google.com/file/d/${fileId}/preview`;
-      embed.allowFullscreen = true;
-    } else {
-      embed = document.createElement("a");
-      embed.href = url;
-      embed.textContent = "Buka video Drive";
-      embed.target = "_blank";
-    }
-  } else if(url.includes("vimeo.com")){
-    let id = url.split("/").pop();
-    embed = document.createElement("iframe");
-    embed.src = `https://player.vimeo.com/video/${id}`;
-    embed.allowFullscreen = true;
-  } else if(url.match(/\.(mp4|m3u8|webm|ogg)$/i)){
-    embed = document.createElement("video");
-    embed.src = url;
-    embed.controls = true;
-  } else {
-    embed = document.createElement("a");
-    embed.href = url;
-    embed.textContent = url;
-    embed.target = "_blank";
-  }
-  embed.style.width = "100%";
-  embed.style.height = "100%";
-  return embed;
-}
-
-// --- Tambah video ke grid ---
-function addVideoToGrid(url, save){
-  if(videoURLs.includes(url)) return;
-
-  const container = document.createElement("div");
-  container.className = "video-container";
-
-  // Tombol hapus
-  const delBtn = document.createElement("button");
-  delBtn.textContent = "X";
-  delBtn.className = "delete-btn";
-  delBtn.onclick = (e)=>{
-    e.stopPropagation();
-    grid.removeChild(container);
-    videoURLs = videoURLs.filter(u=>u!==url);
-    localStorage.setItem("videoRules", JSON.stringify(videoURLs));
-  };
-  container.appendChild(delBtn);
-
-  container.appendChild(generateEmbed(url));
-
-  container.onclick = () => {
-    overlay.style.display="flex";
-    overlay.innerHTML = '<button id="closeOverlay">X</button>';
-    overlay.appendChild(generateEmbed(url));
-    document.getElementById("closeOverlay").onclick = closeOverlayBtn.onclick;
-  };
-
-  grid.appendChild(container);
-
-  if(save){
-    videoURLs.push(url);
-    localStorage.setItem("videoRules", JSON.stringify(videoURLs));
-  }
-}
-
-// --- Tambah video dari textarea ---
-addBtn.onclick = () => {
-  const links = textarea.value.split("\n").map(l=>l.trim()).filter(l=>l);
-  links.forEach(url => addVideoToGrid(url, true));
-  textarea.value="";
-  sidebar.style.right="-320px";
-};
-
-// --- Load dari localStorage saat load halaman ---
-window.onload = () => {
-  const saved = JSON.parse(localStorage.getItem("videoRules") || "[]");
-  saved.forEach(url => addVideoToGrid(url, false));
-};
-</script>
-
+<script src="videos.js"></script>
 </body>
 </html>
