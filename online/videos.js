@@ -52,7 +52,6 @@ function generateEmbed(url){
 
 // Tambah video ke grid
 function addVideoToGrid(url, save = true){
-  if(videoURLs.includes(url)) return; // avoid duplicate
   const container = document.createElement("div");
   container.className = "video-container";
 
@@ -69,7 +68,8 @@ function addVideoToGrid(url, save = true){
   container.appendChild(delBtn);
 
   // Embed video
-  container.appendChild(generateEmbed(url));
+  const embed = generateEmbed(url);
+  container.appendChild(embed);
 
   // Klik container → popup overlay
   container.onclick = () => {
@@ -84,7 +84,8 @@ function addVideoToGrid(url, save = true){
 
   grid.appendChild(container);
 
-  if(save){
+  // Simpan ke array + localStorage
+  if(save && !videoURLs.includes(url)){
     videoURLs.push(url);
     localStorage.setItem("videoURLs", JSON.stringify(videoURLs));
   }
