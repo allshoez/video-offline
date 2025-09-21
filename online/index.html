@@ -3,32 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grid Video + Sidebar + IndexedDB</title>
+<title>Video Grid Persist + Hapus</title>
 <style>
-body { margin:0; font-family:sans-serif; background:#111; color:#fff; }
-header { background:#222; padding:10px; display:flex; justify-content:flex-end; }
-header button { padding:8px 12px; background:#0f0; color:#000; border:none; cursor:pointer; }
-
-/* Grid */
-#videosGrid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; padding:15px; }
-.video-container { border:1px solid #444; height:180px; display:flex; justify-content:center; align-items:center; background:#000; cursor:pointer; }
-
-/* Sidebar */
-#sidebar { position:fixed; top:0; right:-320px; width:300px; height:100%; background:#222; padding:15px; box-sizing:border-box; transition:0.3s; z-index:20; display:flex; flex-direction:column; }
-#sidebar textarea { width:100%; height:80px; margin-bottom:10px; padding:5px; }
-
-#sidebar button { padding:8px; background:#0f0; color:#000; border:none; cursor:pointer; }
-#sidebar div { display:flex; gap:5px; margin-bottom:5px; }
-#sidebar div button { flex:1; }
-
-/* Overlay fullscreen video */
-#overlayVideo { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:#000; justify-content:center; align-items:center; z-index:50; }
-#overlayVideo video, #overlayVideo iframe { width:90%; height:80%; }
-#overlayVideo button { position:absolute; top:10px; right:10px; background:#0f0; color:#000; border:none; padding:5px 10px; cursor:pointer; font-size:16px; z-index:60; }
-
-/* Cache debug */
-#cacheList { position:fixed; bottom:50px; right:10px; width:220px; height:300px; overflow:auto; background:#111; border:1px solid #0f0; color:#0f0; padding:5px; z-index:100; display:none; }
-#cacheList button { margin-bottom:5px; padding:5px; background:#0f0; color:#000; border:none; cursor:pointer; width:100%; }
+body{margin:0;font-family:sans-serif;background:#111;color:#fff;}
+header{background:#222;padding:10px;display:flex;justify-content:flex-end;}
+header button{padding:8px 12px;background:#0f0;color:#000;border:none;cursor:pointer;}
+#videosGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;padding:15px;}
+.video-container{position:relative;border:1px solid #444;height:180px;display:flex;justify-content:center;align-items:center;background:#000;cursor:pointer;overflow:hidden;}
+.video-container button.delete-btn{position:absolute;top:5px;right:5px;padding:2px 5px;background:red;color:#fff;border:none;cursor:pointer;z-index:10;font-size:12px;}
+#sidebar{position:fixed;top:0;right:-320px;width:300px;height:100%;background:#222;padding:15px;box-sizing:border-box;transition:0.3s;display:flex;flex-direction:column;z-index:20;}
+#sidebar textarea{width:100%;height:80px;margin-bottom:10px;padding:5px;}
+#sidebar button{padding:8px;background:#0f0;color:#000;border:none;cursor:pointer;}
+#overlayVideo{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;justify-content:center;align-items:center;z-index:50;}
+#overlayVideo video,#overlayVideo iframe{width:90%;height:80%;}
+#overlayVideo button{position:absolute;top:10px;right:10px;background:#0f0;color:#000;border:none;padding:5px 10px;cursor:pointer;font-size:16px;z-index:60;}
 </style>
 </head>
 <body>
@@ -39,23 +27,17 @@ header button { padding:8px 12px; background:#0f0; color:#000; border:none; curs
 
 <div id="videosGrid"></div>
 
-<!-- Sidebar -->
-<!-- Sidebar -->
 <div id="sidebar">
   <textarea id="videoLinks" placeholder="Masukkan link video/embed, tiap baris 1 link"></textarea>
   <div style="display:flex; gap:5px; margin-bottom:5px;">
     <button id="addVideos" style="flex:1;">OK</button>
-    <button id="showCache" style="flex:1;">Lihat Cache</button>
+    <button id="closeSidebar" style="flex:1;">Tutup</button>
   </div>
-  <button id="closeSidebar">Tutup</button>
 </div>
-<!-- Overlay fullscreen -->
+
 <div id="overlayVideo">
   <button id="closeOverlay">X</button>
 </div>
-
-<!-- Debug IndexedDB -->
-<div id="cacheList"></div>
 
 <script>
 const grid = document.getElementById("videosGrid");
@@ -66,118 +48,107 @@ const addBtn = document.getElementById("addVideos");
 const textarea = document.getElementById("videoLinks");
 const overlay = document.getElementById("overlayVideo");
 const closeOverlayBtn = document.getElementById("closeOverlay");
-const showCacheBtn = document.getElementById("showCache");
-const cacheList = document.getElementById("cacheList");
 
-let overlayContent = null;
+let videoURLs = [];
 
-// --- IndexedDB ---
-let db;
-const request = indexedDB.open("videoCacheDB", 1);
-request.onupgradeneeded = e => {
-  db = e.target.result;
-  if(!db.objectStoreNames.contains("videos")) db.createObjectStore("videos", { keyPath:"url" });
-};
-request.onsuccess = e => db = e.target.result;
-request.onerror = e => console.error("IndexedDB error", e);
-
-function cacheVideo(url, blob){
-  if(!db) return;
-  const tx = db.transaction("videos","readwrite");
-  tx.objectStore("videos").put({url, blob});
-}
-
-function getCachedVideo(url){
-  return new Promise(resolve => {
-    if(!db) return resolve(null);
-    const tx = db.transaction("videos","readonly");
-    const req = tx.objectStore("videos").get(url);
-    req.onsuccess = () => resolve(req.result ? req.result.blob : null);
-    req.onerror = () => resolve(null);
-  });
-}
-
-// Sidebar toggle
+// --- Sidebar toggle ---
 toggleSidebarBtn.onclick = () => { sidebar.style.right="0"; };
 closeSidebarBtn.onclick = () => { sidebar.style.right="-320px"; };
 
-// Tambah video
+// --- Overlay ---
+closeOverlayBtn.onclick = () => {
+  overlay.style.display="none";
+  overlay.innerHTML = '<button id="closeOverlay">X</button>';
+};
+
+// --- Generate embed berdasarkan URL ---
+function generateEmbed(url){
+  let embed;
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  if(ytMatch){
+    embed = document.createElement("iframe");
+    embed.src = `https://www.youtube.com/embed/${ytMatch[1]}`;
+    embed.allowFullscreen = true;
+  } else if(url.includes("drive.google.com")){
+    let fileId = url.match(/\/d\/(.*?)\//)?.[1] || url.match(/id=(.*)/)?.[1];
+    if(fileId){
+      embed = document.createElement("iframe");
+      embed.src = `https://drive.google.com/file/d/${fileId}/preview`;
+      embed.allowFullscreen = true;
+    } else {
+      embed = document.createElement("a");
+      embed.href = url;
+      embed.textContent = "Buka video Drive";
+      embed.target = "_blank";
+    }
+  } else if(url.includes("vimeo.com")){
+    let id = url.split("/").pop();
+    embed = document.createElement("iframe");
+    embed.src = `https://player.vimeo.com/video/${id}`;
+    embed.allowFullscreen = true;
+  } else if(url.match(/\.(mp4|m3u8|webm|ogg)$/i)){
+    embed = document.createElement("video");
+    embed.src = url;
+    embed.controls = true;
+  } else {
+    embed = document.createElement("a");
+    embed.href = url;
+    embed.textContent = url;
+    embed.target = "_blank";
+  }
+  embed.style.width = "100%";
+  embed.style.height = "100%";
+  return embed;
+}
+
+// --- Tambah video ke grid ---
+function addVideoToGrid(url, save){
+  if(videoURLs.includes(url)) return;
+
+  const container = document.createElement("div");
+  container.className = "video-container";
+
+  // Tombol hapus
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "X";
+  delBtn.className = "delete-btn";
+  delBtn.onclick = (e)=>{
+    e.stopPropagation();
+    grid.removeChild(container);
+    videoURLs = videoURLs.filter(u=>u!==url);
+    localStorage.setItem("videoRules", JSON.stringify(videoURLs));
+  };
+  container.appendChild(delBtn);
+
+  container.appendChild(generateEmbed(url));
+
+  container.onclick = () => {
+    overlay.style.display="flex";
+    overlay.innerHTML = '<button id="closeOverlay">X</button>';
+    overlay.appendChild(generateEmbed(url));
+    document.getElementById("closeOverlay").onclick = closeOverlayBtn.onclick;
+  };
+
+  grid.appendChild(container);
+
+  if(save){
+    videoURLs.push(url);
+    localStorage.setItem("videoRules", JSON.stringify(videoURLs));
+  }
+}
+
+// --- Tambah video dari textarea ---
 addBtn.onclick = () => {
   const links = textarea.value.split("\n").map(l=>l.trim()).filter(l=>l);
-  if(links.length===0) return;
-  links.forEach(addVideoToGrid);
+  links.forEach(url => addVideoToGrid(url, true));
   textarea.value="";
   sidebar.style.right="-320px";
 };
 
-// Overlay fullscreen
-closeOverlayBtn.onclick = () => {
-  overlay.style.display="none";
-  if(overlayContent){
-    if(overlayContent.tagName==="VIDEO") overlayContent.pause();
-    overlay.removeChild(overlayContent);
-    overlayContent=null;
-  }
-};
-
-// Tambah video grid
-function addVideoToGrid(url){
-  const container = document.createElement("div");
-  container.className = "video-container";
-
-  container.onclick = async () => {
-    overlay.style.display="flex";
-    overlay.innerHTML="";
-    overlay.appendChild(closeOverlayBtn);
-
-    if(url.includes(".mp4") || url.includes(".m3u8")){
-      let cachedBlob = await getCachedVideo(url);
-      overlayContent = document.createElement("video");
-      overlayContent.controls = true;
-      overlayContent.autoplay = true;
-
-      if(cachedBlob){
-        overlayContent.src = URL.createObjectURL(cachedBlob);
-      } else {
-        fetch(url).then(r=>r.blob()).then(blob=>{
-          cacheVideo(url, blob);
-          overlayContent.src = URL.createObjectURL(blob);
-        });
-      }
-    } else {
-      overlayContent = document.createElement("iframe");
-      overlayContent.src = url;
-      overlayContent.allowFullscreen = true;
-    }
-
-    overlay.appendChild(overlayContent);
-  };
-
-  grid.appendChild(container);
-}
-
-// Debug cache di sidebar
-showCacheBtn.onclick = () => {
-  if(!db) return alert("DB belum siap");
-  if(cacheList.style.display==="block"){ cacheList.style.display="none"; return; }
-
-  const tx = db.transaction("videos","readonly");
-  const req = tx.objectStore("videos").getAll();
-  req.onsuccess = () => {
-    cacheList.innerHTML="";
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent="X Tutup";
-    closeBtn.onclick = ()=> cacheList.style.display="none";
-    cacheList.appendChild(closeBtn);
-
-    req.result.forEach(item=>{
-      const div = document.createElement("div");
-      div.textContent = item.url+" ("+(item.blob.size/1024/1024).toFixed(2)+" MB)";
-      cacheList.appendChild(div);
-    });
-
-    cacheList.style.display="block";
-  };
+// --- Load dari localStorage saat load halaman ---
+window.onload = () => {
+  const saved = JSON.parse(localStorage.getItem("videoRules") || "[]");
+  saved.forEach(url => addVideoToGrid(url, false));
 };
 </script>
 
